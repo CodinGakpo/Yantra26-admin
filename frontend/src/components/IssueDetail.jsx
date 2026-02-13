@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   getIssueDetail,
   updateIssueStatus,
+  decideIssueAppeal,
   getPresignedUpload,
   resolveIssue,
   downloadIssuePDF,
@@ -29,6 +30,7 @@ const IssueDetail = () => {
   const [file, setFile] = useState(null);
   const [resolving, setResolving] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [appealDecisionLoading, setAppealDecisionLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -65,12 +67,10 @@ const IssueDetail = () => {
   }, [issue?.image_presigned_url]);
 
   useEffect(() => {
-    if (!showResolveModal) return;
-
     getCurrentUser()
       .then(setCurrentUser)
-      .catch(() => alert("Failed to load user info"));
-  }, [showResolveModal]);
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!showImagePreview) return;
@@ -114,10 +114,6 @@ const IssueDetail = () => {
   const handleStatusChange = async (newStatus) => {
     if (!issue || newStatus === issue.status) return;
 
-    if (issue.status === "pending" && newStatus !== "in_progress") return;
-    if (issue.status === "in_progress" && newStatus === "pending") return;
-    if (issue.status === "escalated" && newStatus !== "resolved") return;
-
     if (newStatus === "resolved") {
       setShowResolveModal(true);
       return;
@@ -134,6 +130,19 @@ const IssueDetail = () => {
       setIssue((prev) => ({ ...prev, ...updated }));
     } catch (err) {
       alert(err.message || "Failed to update status");
+    }
+  };
+
+  const handleAppealDecision = async (decision) => {
+    if (!issue || appealDecisionLoading) return;
+    setAppealDecisionLoading(true);
+    try {
+      const updated = await decideIssueAppeal(issue.tracking_id, decision);
+      setIssue((prev) => ({ ...prev, ...updated }));
+    } catch (err) {
+      alert(err.message || "Failed to decide appeal");
+    } finally {
+      setAppealDecisionLoading(false);
     }
   };
 
@@ -203,6 +212,8 @@ const IssueDetail = () => {
         return <AlertCircle className="w-4 h-4" />;
       case "resolved":
         return <CheckCircle2 className="w-4 h-4" />;
+      case "rejected":
+        return <X className="w-4 h-4" />;
       default:
         return null;
     }
@@ -225,6 +236,8 @@ const IssueDetail = () => {
                       ? "bg-yellow-100 text-yellow-800"
                       : issue.status === "in_progress"
                       ? "bg-blue-100 text-blue-800"
+                      : issue.status === "rejected"
+                      ? "bg-rose-100 text-rose-800"
                       : issue.status === "escalated"
                       ? "bg-red-100 text-red-800"
                       : "bg-green-100 text-green-800"
@@ -237,6 +250,35 @@ const IssueDetail = () => {
               <p className="text-sm text-gray-500">
                 Tracking ID: <span className="font-mono font-medium text-gray-700">{issue.tracking_id}</span>
               </p>
+              <div className="mt-2 flex items-center flex-wrap gap-2">
+                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold border border-gray-200">
+                  Appeal: {(issue.appeal_status || "not_appealed").replace("_", " ").toUpperCase()}
+                </span>
+                {typeof issue.trust_score_delta === "number" && (
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                      issue.trust_score_delta > 0
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                        : issue.trust_score_delta < 0
+                        ? "bg-rose-100 text-rose-800 border-rose-200"
+                        : "bg-gray-100 text-gray-700 border-gray-200"
+                    }`}
+                  >
+                    Trust Delta: {issue.trust_score_delta > 0 ? "+" : ""}
+                    {issue.trust_score_delta}
+                  </span>
+                )}
+                {typeof issue.user_trust_score === "number" && (
+                  <span className="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs font-semibold border border-indigo-200">
+                    User Trust: {issue.user_trust_score}
+                  </span>
+                )}
+                {issue.user_deactivated_until && (
+                  <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-200">
+                    Deactivated till {new Date(issue.user_deactivated_until).toLocaleString()}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="flex gap-2">
@@ -314,12 +356,40 @@ const IssueDetail = () => {
                     <option value="resolved" disabled={!["in_progress", "escalated"].includes(issue.status)}>
                       Resolved
                     </option>
+                    <option value="rejected" disabled={!["pending", "in_progress", "escalated"].includes(issue.status)}>
+                      Rejected (Fake Report)
+                    </option>
                   </select>
                 </div>
               </div>
             )}
           </div>
         </div>
+
+        {issue.status === "rejected" && issue.appeal_status === "pending" && currentUser?.is_root && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-amber-900">Pending Appeal Requires Root Decision</p>
+              <p className="text-sm text-amber-800">Accept restores trust by +13 and reopens this issue. Reject keeps this report finalized.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleAppealDecision("accepted")}
+                disabled={appealDecisionLoading}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+              >
+                Accept Appeal
+              </button>
+              <button
+                onClick={() => handleAppealDecision("rejected")}
+                disabled={appealDecisionLoading}
+                className="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-60"
+              >
+                Reject Appeal
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Debug Info */}
         {imageError && imageErrorDetails && (

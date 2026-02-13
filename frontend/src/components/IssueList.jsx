@@ -5,7 +5,15 @@ import { ListChecks, Search, Filter } from "lucide-react";
 
 const IssueList = () => {
   const [issues, setIssues] = useState([]);
+  const [statusCounts, setStatusCounts] = useState({
+    pending: 0,
+    in_progress: 0,
+    rejected: 0,
+    all: 0,
+  });
   const [statusFilter, setStatusFilter] = useState("all");
+  const [appealFilter, setAppealFilter] = useState("all");
+  const [deactivatedFilter, setDeactivatedFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -16,7 +24,10 @@ const IssueList = () => {
     setLoading(true);
     setError("");
 
-    getIssues(statusFilter)
+    getIssues(statusFilter, {
+      appeal_status: appealFilter,
+      deactivated: deactivatedFilter,
+    })
       .then((data) => {
         if (!mounted) return;
         setIssues(data);
@@ -33,7 +44,42 @@ const IssueList = () => {
     return () => {
       mounted = false;
     };
-  }, [statusFilter]);
+  }, [statusFilter, appealFilter, deactivatedFilter]);
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      getIssues("pending", {
+        appeal_status: appealFilter,
+        deactivated: deactivatedFilter,
+      }),
+      getIssues("in_progress", {
+        appeal_status: appealFilter,
+        deactivated: deactivatedFilter,
+      }),
+      getIssues("rejected", {
+        appeal_status: appealFilter,
+        deactivated: deactivatedFilter,
+      }),
+    ])
+      .then(([pendingIssues, inProgressIssues, rejectedIssues]) => {
+        if (!mounted) return;
+        const pending = pendingIssues.length;
+        const in_progress = inProgressIssues.length;
+        const rejected = rejectedIssues.length;
+        setStatusCounts({
+          pending,
+          in_progress,
+          rejected,
+          all: pending + in_progress + rejected,
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, [appealFilter, deactivatedFilter]);
 
   const filteredIssues = issues.filter((issue) => {
     if (!searchQuery) return true;
@@ -46,9 +92,10 @@ const IssueList = () => {
   });
 
   const statusOptions = [
-    { value: "all", label: "All Issues", count: issues.length },
-    { value: "pending", label: "Pending", count: issues.filter(i => i.status === "pending").length },
-    { value: "in_progress", label: "In Progress", count: issues.filter(i => i.status === "in_progress").length },
+    { value: "all", label: "All Issues", count: statusCounts.all },
+    { value: "pending", label: "Pending", count: statusCounts.pending },
+    { value: "in_progress", label: "In Progress", count: statusCounts.in_progress },
+    { value: "rejected", label: "Rejected", count: statusCounts.rejected },
   ];
 
   const getStatusStyle = (status) => {
@@ -59,6 +106,8 @@ const IssueList = () => {
         return "bg-blue-100 text-blue-800 border-blue-200";
       case "resolved":
         return "bg-green-100 text-green-800 border-green-200";
+      case "rejected":
+        return "bg-red-100 text-red-800 border-red-200";
       default:
         return "bg-gray-100 text-gray-800 border-gray-200";
     }
@@ -79,7 +128,7 @@ const IssueList = () => {
         </div>
 
         {/* Filters and Search */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-3">
           {/* Search */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -94,13 +143,12 @@ const IssueList = () => {
             />
           </div>
 
-          {/* Status Filter */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {statusOptions.map((option) => (
               <button
                 key={option.value}
                 onClick={() => setStatusFilter(option.value)}
-                className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all border-2 ${
+                className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all border-2 ${
                   statusFilter === option.value
                     ? "bg-black text-white border-black"
                     : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
@@ -110,6 +158,30 @@ const IssueList = () => {
                 <span className="ml-2 text-xs opacity-75">({option.count})</span>
               </button>
             ))}
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={appealFilter}
+              onChange={(e) => setAppealFilter(e.target.value)}
+              className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-medium bg-white"
+            >
+              <option value="all">All Appeals</option>
+              <option value="pending">Pending Appeals</option>
+              <option value="accepted">Accepted Appeals</option>
+              <option value="rejected">Rejected Appeals</option>
+              <option value="not_appealed">Not Appealed</option>
+            </select>
+
+            <select
+              value={deactivatedFilter}
+              onChange={(e) => setDeactivatedFilter(e.target.value)}
+              className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-medium bg-white"
+            >
+              <option value="all">All Reporters</option>
+              <option value="true">Deactivated Reporters</option>
+              <option value="false">Active Reporters</option>
+            </select>
           </div>
         </div>
       </div>
@@ -169,6 +241,25 @@ const IssueList = () => {
 
                 <div className="font-medium text-gray-900 group-hover:text-black">
                   {issue.issue_title}
+                  <div className="mt-1 flex gap-2 flex-wrap">
+                    {issue.appeal_status && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                        APPEAL: {issue.appeal_status.toUpperCase()}
+                      </span>
+                    )}
+                    {typeof issue.trust_score_delta === "number" && issue.trust_score_delta !== 0 && (
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          issue.trust_score_delta > 0
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                            : "bg-rose-100 text-rose-800 border-rose-200"
+                        }`}
+                      >
+                        TRUST {issue.trust_score_delta > 0 ? "+" : ""}
+                        {issue.trust_score_delta}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="text-gray-600 text-sm">
@@ -185,6 +276,11 @@ const IssueList = () => {
                   >
                     {issue.status.replace("_", " ").toUpperCase()}
                   </span>
+                  {issue.user_deactivated_until && (
+                    <div className="text-[11px] text-red-700 mt-1 font-medium">
+                      Deactivated till {new Date(issue.user_deactivated_until).toLocaleString()}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

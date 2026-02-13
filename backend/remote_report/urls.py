@@ -4,6 +4,7 @@ from .views import (
     IssueDetailView,
     IssueResolveView,
     IssueStatusUpdateView,
+    IssueAppealDecisionView,
     IssuePDFView,
 )
 
@@ -14,6 +15,11 @@ urlpatterns = [
         "issues/<str:tracking_id>/status/",
         IssueStatusUpdateView.as_view(),
         name="issue-status",
+    ),
+    path(
+        "issues/<str:tracking_id>/appeal/decision/",
+        IssueAppealDecisionView.as_view(),
+        name="issue-appeal-decision",
     ),
     path(
         "issues/<str:tracking_id>/resolve/",
