@@ -1,0 +1,53 @@
+[
+{
+  "model": "accounts.user",
+  "pk": 1,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$jPeJdjqkIUDq9GVnWREuFp$RWwMFd6vzMkfPSW/Bxem8CmWOmMv41Nhw1CrfwH+qKA=",
+    "last_login": "2025-12-11T19:56:53.736Z",
+    "is_superuser": true,
+    "userid": "dc",
+    "full_name": "",
+    "department": "",
+    "is_root": true,
+    "is_active": true,
+    "is_staff": true,
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "accounts.user",
+  "pk": 2,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$Uwa1y4tTKrDgJK268jLky8$vvlnwrb3A/t6SwBcqW7c37RWbTJ7zq3dPr94B/qTCCA=",
+    "last_login": null,
+    "is_superuser": false,
+    "userid": "abc123",
+    "full_name": "",
+    "department": "road",
+    "is_root": true,
+    "is_active": true,
+    "is_staff": false,
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "accounts.user",
+  "pk": 3,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$b5C3xNWDPoMQg1ey955yWg$xTfB8gM9AXhazMsuinhwuaSvSdcFTqNiDBmyueLKmYA=",
+    "last_login": null,
+    "is_superuser": false,
+    "userid": "pablo1",
+    "full_name": "Pablo Escabar",
+    "department": "Plumbing",
+    "is_root": true,
+    "is_active": true,
+    "is_staff": false,
+    "groups": [],
+    "user_permissions": []
+  }
+}
+]
