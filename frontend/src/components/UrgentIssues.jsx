@@ -48,9 +48,9 @@ const UrgentIssues = () => {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="mb-6">
-        <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-2xl p-6 shadow-lg mb-4">
+        <div className="bg-linear-to-r from-red-500 to-red-600 rounded-2xl p-6 shadow-lg mb-4">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center flex-shrink-0">
+            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center shrink-0">
               <AlertTriangle className="w-8 h-8 text-red-600 animate-pulse" />
             </div>
             <div className="flex-1">
