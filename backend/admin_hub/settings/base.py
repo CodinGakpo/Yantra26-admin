@@ -27,7 +27,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "storages",
 
-    "accounts",
+    "accounts.apps.AccountsConfig",
     "remote_report",
     "sensor_alerts",
 ]
@@ -44,6 +44,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+    "accounts.middleware.AutoDeactivationMiddleware",
 ]
 
 ROOT_URLCONF = "admin_hub.urls"
@@ -77,10 +79,23 @@ REST_FRAMEWORK = {
     ),
 }
 
+CACHES = {
+       'default': {
+           'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+           'LOCATION': 'auto-reactivation',
+       }
+   }
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+ADMIN_AUTO_DEACTIVATION = {
+    'MIN_DISLIKES': 20,
+    'DISLIKE_RATIO_THRESHOLD': 0.60,
+    'DEACTIVATION_DURATION_HOURS': 24,
 }
 
 # Database

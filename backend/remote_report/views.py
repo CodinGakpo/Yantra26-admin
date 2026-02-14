@@ -5,8 +5,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from .models import IssueReportRemote
+from django.db import transaction
+
+from .models import IssueReportRemote, CustomUserRemote
 from .serializers import IssueReportSerializer
+from .services import apply_reject_penalty, adjudicate_appeal
 from rest_framework import status
 from django.conf import settings
 import boto3
@@ -39,7 +42,9 @@ class IssueListView(APIView):
 
     def get(self, request):
         user = request.user
-        status = request.GET.get("status")
+        status_param = request.GET.get("status")
+        appeal_status = request.GET.get("appeal_status")
+        deactivated_filter = request.GET.get("deactivated")
 
         # Auto-escalate stale in_progress issues
         self._auto_escalate_stale_issues(user.department)
@@ -48,10 +53,25 @@ class IssueListView(APIView):
             department=user.department
         )
 
-        if status:
-            issues = issues.filter(status=status)
+        if status_param:
+            issues = issues.filter(status=status_param)
         else:
             issues = issues.filter(status__in = ["pending","in_progress"])
+
+        if appeal_status:
+            issues = issues.filter(appeal_status=appeal_status)
+
+        if deactivated_filter is not None:
+            if str(deactivated_filter).lower() == "true":
+                reporter_ids = CustomUserRemote.objects.filter(
+                    deactivated_until__gt=timezone.now()
+                ).values_list("id", flat=True)
+                issues = issues.filter(user_id__in=reporter_ids)
+            elif str(deactivated_filter).lower() == "false":
+                reporter_ids = CustomUserRemote.objects.filter(
+                    deactivated_until__gt=timezone.now()
+                ).values_list("id", flat=True)
+                issues = issues.exclude(user_id__in=reporter_ids)
 
         issues = issues.order_by("-issue_date")
 
@@ -110,12 +130,32 @@ class IssueStatusUpdateView(APIView):
 
     def patch(self, request, tracking_id):
         issue = get_object_or_404(IssueReportRemote, tracking_id=tracking_id)
+
+        if issue.department != request.user.department:
+            raise PermissionDenied("Access denied")
+
         new_status = request.data.get("status")
 
-        if new_status not in ["pending", "in_progress", "escalated", "resolved"]:
+        if new_status not in ["pending", "in_progress", "escalated", "resolved", "rejected"]:
             return Response(
                 {"detail": "Invalid status"},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if new_status == "rejected":
+            with transaction.atomic():
+                locked_issue = IssueReportRemote.objects.select_for_update().get(pk=issue.pk)
+                result = apply_reject_penalty(report=locked_issue, admin_user=request.user)
+
+            return Response(
+                {
+                    "status": locked_issue.status,
+                    "appeal_status": locked_issue.appeal_status,
+                    "trust_score_delta": locked_issue.trust_score_delta,
+                    "user_trust_score": result["user"].trust_score,
+                    "user_deactivated_until": result["user"].deactivated_until,
+                    "penalty_applied": result["applied"],
+                }
             )
 
         current = issue.status
@@ -136,7 +176,7 @@ class IssueStatusUpdateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        elif current in ["escalated", "resolved"]:
+        elif current in ["escalated", "resolved", "rejected"]:
             return Response(
                 {"detail": f"{current} issues cannot change status"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -147,7 +187,50 @@ class IssueStatusUpdateView(APIView):
         issue.save()
 
         return Response(
-            {"status": issue.status, "allocated_to": issue.allocated_to}
+            {
+                "status": issue.status,
+                "allocated_to": issue.allocated_to,
+                "appeal_status": issue.appeal_status,
+                "trust_score_delta": issue.trust_score_delta,
+                "user_trust_score": CustomUserRemote.objects.filter(id=issue.user_id).values_list("trust_score", flat=True).first(),
+                "user_deactivated_until": CustomUserRemote.objects.filter(id=issue.user_id).values_list("deactivated_until", flat=True).first(),
+            }
+        )
+
+
+class IssueAppealDecisionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, tracking_id):
+        decision = request.data.get("decision")
+        issue = get_object_or_404(IssueReportRemote, tracking_id=tracking_id)
+
+        if not request.user.is_root:
+            raise PermissionDenied("Root admin access required")
+
+        if issue.department != request.user.department:
+            raise PermissionDenied("Access denied")
+
+        try:
+            with transaction.atomic():
+                locked_issue = IssueReportRemote.objects.select_for_update().get(pk=issue.pk)
+                result = adjudicate_appeal(
+                    report=locked_issue,
+                    decision=decision,
+                    admin_user=request.user,
+                )
+        except ValueError as exc:
+            raise ValidationError(str(exc))
+
+        return Response(
+            {
+                "status": locked_issue.status,
+                "appeal_status": locked_issue.appeal_status,
+                "trust_score_delta": locked_issue.trust_score_delta,
+                "user_trust_score": result["user"].trust_score,
+                "user_deactivated_until": result["user"].deactivated_until,
+            },
+            status=status.HTTP_200_OK,
         )
 
 

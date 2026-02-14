@@ -80,8 +80,16 @@ export async function getCurrentUser() {
   return res.json();
 }
 
-export async function getIssues(status = null) {
-  const qs = status && status !== "all" ? `?status=${status}` : "";
+export async function getIssues(status = null, filters = {}) {
+  const params = new URLSearchParams();
+  if (status && status !== "all") params.set("status", status);
+  if (filters.appeal_status && filters.appeal_status !== "all") {
+    params.set("appeal_status", filters.appeal_status);
+  }
+  if (filters.deactivated && filters.deactivated !== "all") {
+    params.set("deactivated", filters.deactivated);
+  }
+  const qs = params.toString() ? `?${params.toString()}` : "";
 
   const res = await fetchWithAuth(
     `${API_BASE}/restapi/issues/${qs}`,
@@ -151,6 +159,24 @@ export async function updateIssueStatus(trackingId, status) {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`updateIssueStatus failed: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function decideIssueAppeal(trackingId, decision) {
+  const res = await fetchWithAuth(
+    `${API_BASE}/restapi/issues/${trackingId}/appeal/decision/`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`decideIssueAppeal failed: ${res.status} ${text}`);
   }
 
   return res.json();

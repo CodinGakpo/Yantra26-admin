@@ -31,6 +31,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_root = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    
+    # Auto-deactivation fields
+    auto_deactivated = models.BooleanField(default=False)
+    auto_deactivated_at = models.DateTimeField(null=True, blank=True)
+    auto_reactivation_scheduled = models.BooleanField(default=False)
+    
     objects = UserManager()
 
     USERNAME_FIELD = "userid"
@@ -45,6 +51,8 @@ class ActivityLog(models.Model):
         ('delete', 'Account Deleted'),
         ('activate', 'Account Activated'),
         ('deactivate', 'Account Deactivated'),
+        ('auto_deactivate', 'Auto-Deactivated (Feedback)'),
+        ('auto_reactivate', 'Auto-Reactivated'),
         ('login', 'Login'),
         ('logout', 'Logout'),
     ]
