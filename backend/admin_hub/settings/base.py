@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # SECURITY
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Applications
 INSTALLED_APPS = [
@@ -28,6 +29,7 @@ INSTALLED_APPS = [
 
     "accounts",
     "remote_report",
+    "sensor_alerts",
 ]
 ROOT_URLCONF = "admin_hub.urls"
 WSGI_APPLICATION = "admin_hub.wsgi.application"
@@ -115,3 +117,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+
+# Email alerts
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com")
+ADMIN_ALERT_EMAIL = os.environ.get("ADMIN_ALERT_EMAIL", "admin@example.com")

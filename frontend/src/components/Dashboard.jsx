@@ -6,6 +6,8 @@ import {
   AlertTriangle,
   User,
   History,
+  BellRing,
+  Siren,
   UserPlus,
   UserCog,
   ScrollText,
@@ -45,6 +47,18 @@ function DashboardHome({ isRoot }) {
       label: "Track issue history & workflow",
       route: "history",
       color: "bg-purple-50 text-purple-600",
+    },
+    {
+      icon: BellRing,
+      label: "Review all sensor alerts",
+      route: "sensor-alerts",
+      color: "bg-amber-50 text-amber-700",
+    },
+    {
+      icon: Siren,
+      label: "Respond to active sensor alerts",
+      route: "sensor-alerts-active",
+      color: "bg-rose-50 text-rose-600",
     },
   ];
 
@@ -200,6 +214,8 @@ function Dashboard() {
     { label: "Issue List", to: "issues", icon: ListChecks },
     { label: "Urgent Issues", to: "urgent", icon: AlertTriangle },
     { label: "Issue History", to: "history", icon: History },
+    { label: "Sensor Alerts", to: "sensor-alerts", icon: BellRing },
+    { label: "Active Alerts", to: "sensor-alerts-active", icon: Siren },
     ...(user.isRoot
       ? [
           { label: "Account Management", to: "create", icon: UserPlus },
