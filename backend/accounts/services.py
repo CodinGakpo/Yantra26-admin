@@ -1,10 +1,3 @@
-"""
-Service layer for handling admin auto-deactivation based on feedback.
-NO CELERY VERSION - Uses database polling for reactivation.
-
-SPECIAL NOTE: This version works with read-only IssueReportRemote model
-that doesn't have ManyToMany fields. It queries likes/dislikes directly from DB.
-"""
 from django.utils import timezone
 from django.db import transaction, connection
 from django.contrib.auth import get_user_model
@@ -27,6 +20,7 @@ class AdminDeactivationService:
     DEACTIVATION_DURATION_HOURS = 24
     
     @classmethod
+    @transaction.atomic  # FIXED: Added transaction wrapper
     def evaluate_admin_feedback(cls, admin_userid):
         """
         Evaluate an admin's feedback and deactivate if thresholds are met.
@@ -308,47 +302,41 @@ class AdminDeactivationService:
             'total_processed': reactivated_count + failed_count
         }
     
-classmethod
-def evaluate_all_admins(cls):
-    """
-    Evaluate all non-root, active admins for auto-deactivation.
-    This should be called periodically (e.g., every 5 minutes via middleware or cron).
-    
-    Returns:
-        dict: Summary of evaluations
-    """
-    # Get all admins who should be evaluated
-    # Don't include already auto-deactivated ones
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
-    
-    admins = User.objects.filter(
-        is_root=False,
-        is_active=True,
-        auto_deactivated=False
-    )
-    
-    evaluated_count = 0
-    deactivated_count = 0
-    
-    for admin in admins:
-        # Each evaluation needs its own transaction
-        # since evaluate_admin_feedback now wraps everything in transaction.atomic()
-        result = cls.evaluate_admin_feedback(admin.userid)
-        evaluated_count += 1
+    @classmethod  # FIXED: Added missing @ symbol
+    def evaluate_all_admins(cls):
+        """
+        Evaluate all non-root, active admins for auto-deactivation.
+        This should be called periodically (e.g., every 5 minutes via middleware or cron).
         
-        if result.get('success'):
-            deactivated_count += 1
-            logger.warning(
-                f"Auto-deactivated {admin.userid} during batch evaluation"
-            )
-    
-    logger.info(
-        f"Batch evaluation: {evaluated_count} admins evaluated, "
-        f"{deactivated_count} deactivated"
-    )
-    
-    return {
-        'evaluated': evaluated_count,
-        'deactivated': deactivated_count
-    }
+        Returns:
+            dict: Summary of evaluations
+        """
+        admins = User.objects.filter(
+            is_root=False,
+            is_active=True,
+            auto_deactivated=False
+        )
+        
+        evaluated_count = 0
+        deactivated_count = 0
+        
+        for admin in admins:
+            # evaluate_admin_feedback handles its own transaction now
+            result = cls.evaluate_admin_feedback(admin.userid)
+            evaluated_count += 1
+            
+            if result.get('success'):
+                deactivated_count += 1
+                logger.warning(
+                    f"Auto-deactivated {admin.userid} during batch evaluation"
+                )
+        
+        logger.info(
+            f"Batch evaluation: {evaluated_count} admins evaluated, "
+            f"{deactivated_count} deactivated"
+        )
+        
+        return {
+            'evaluated': evaluated_count,
+            'deactivated': deactivated_count
+        }
