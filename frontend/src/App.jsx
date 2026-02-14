@@ -11,6 +11,8 @@ import AccountManagement from "./components/AccountManagement";
 import AccountActivation from "./components/AccountActivation";
 import AccountLogs from "./components/AccountLogs";
 import IssueDetail from "./components/IssueDetail";
+import SensorAlerts from "./components/SensorAlerts";
+import ActiveSensorAlerts from "./components/ActiveSensorAlerts";
 
 export default function App() {
   return (
@@ -37,6 +39,8 @@ export default function App() {
             <Route path="urgent" element={<UrgentIssues />} />
             <Route path="profile" element={<Profile />} />
             <Route path="history" element={<IssueHistory />} />
+            <Route path="sensor-alerts" element={<SensorAlerts />} />
+            <Route path="sensor-alerts-active" element={<ActiveSensorAlerts />} />
             
             {/* Root-only pages */}
             <Route path="create" element={<AccountManagement />} />

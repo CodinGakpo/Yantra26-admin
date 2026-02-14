@@ -268,3 +268,55 @@ export async function getActivityLogs() {
 
   return res.json();
 }
+
+export async function getSensorAlerts() {
+  const res = await fetchWithAuth(`${API_BASE}/api/sensor-alerts/`, {
+    method: "GET",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`getSensorAlerts failed: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function getActiveSensorAlerts() {
+  const res = await fetchWithAuth(`${API_BASE}/api/sensor-alerts/active/`, {
+    method: "GET",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`getActiveSensorAlerts failed: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function acknowledgeSensorAlert(reportId) {
+  const res = await fetchWithAuth(`${API_BASE}/api/sensor-alerts/${reportId}/ack/`, {
+    method: "PATCH",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`acknowledgeSensorAlert failed: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function resolveSensorAlert(reportId) {
+  const res = await fetchWithAuth(`${API_BASE}/api/sensor-alerts/${reportId}/resolve/`, {
+    method: "PATCH",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`resolveSensorAlert failed: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
